@@ -1,43 +1,125 @@
-import {SimpleSequentialChain} from "langchain/chains";
-import {OpenAI} from "langchain/llms/openai";
-import { PromptTemplate } from "langchain/prompts";
-import { LLMChain } from "langchain/chains";
+// import {OpenAI} from "langchain/llms/openai";
+// import {PromptTemplate} from "langchain/prompts";
+// import {LLMChain} from "langchain/chains";
+//
+// const model = new OpenAI({openAIApiKey: import.meta.env.VITE_OPENAI_API_KEY, temperature: 0.9});
+//
+// const template = "What is a good name for a company that makes {product}?";
+// const prompt = new PromptTemplate({
+//     template: template,
+//     inputVariables: ["product"],
+// });
+//
+// const chain = new LLMChain({llm: model, prompt: prompt});
+//
+// const res = await chain.call({product: "colorful socks"});
+// console.log(res.text);
+// console.log()
 
-// Reference https://js.langchain.com/docs/modules/chains/sequential_chain
+import {OpenAI} from "langchain/llms/openai";
+import {
+    instructionsToOptimus,
+    templateCreateDateFormat,
+    templateDataSummary,
+    templateProgramByExample,
+    templateRegex,
+    textToInstructions
+} from "./prompts";
+import {LLMChain, PromptTemplate} from "langchain";
+import {SimpleSequentialChain} from "langchain/chains";
+
 
 const llmTemperature: number = 0.7;
 
-const llm = new OpenAI({openAIApiKey: import.meta.env.VITE_OPENAI_API_KEY, temperature: llmTemperature});
+const model = new OpenAI(
+    {
+        openAIApiKey: import.meta.env.VITE_OPENAI_API_KEY,
+        temperature: llmTemperature,
+        modelName: "gpt-3.5-turbo",
+    });
 
-let template = `
-You are a playwright. Given the title of play, it is your job to write a synopsis for that title.
-Title: {title}
-Playwright: This is a synopsis for the above play:`
+/**
+ * Explain or create a summary of the Data and the columns.
+ * @param dataTable - The data schema like the following:
+ *     | ID | Subscription_Date | Package_Type | Monthly_Cost | Data_Usage_GB | Overage_Fees | Total_Calls | Churned |
+ *     |----|-------------------|--------------|--------------|---------------|--------------|-------------|---------|
+ *     | 1  | 2021-01-01       | Premium      | 30.00        | 12.5          | 0.00         | 500         | No      |
+ *     | 2  | 2020-07-01       | Standard     | 20.00        | 15.0          | 10.00        | 300         | Yes     |
+ *     | 3  | 2022-03-01       | Economy      | 15.00        | 5.0           | 0.00         | 200         | No      |
+ */
+export const dataSummary = async (dataTable: string) => {
+    console.log(dataTable)
+    const prompt = new PromptTemplate({
+        template: templateDataSummary,
+        inputVariables: ["dataSchema"],
+    });
+    const chain = new LLMChain({llm: model, prompt: prompt});
+    return await chain.call({dataSchema: dataTable})
+}
+/**
+ * Create a python Regular Expression. input should be a string.
+ * @param instruction
+ */
+export const createRegex = async (instruction: string) => {
+    const prompt = new PromptTemplate({
+        template: templateRegex,
+        inputVariables: ["instruction"],
+    });
+    const chain = new LLMChain({llm: model, prompt: prompt});
+    return await chain.call({instruction: instruction})
+}
+/**
+ * Create a python Date Format from a description. input should be a string.
+ * @param instruction
+ */
+export const createDateFormat = async (instruction: string) => {
+    const prompt = new PromptTemplate({
+        template: templateCreateDateFormat,
+        inputVariables: ["instruction"],
+    });
+    const chain = new LLMChain({llm: model, prompt: prompt});
+    return await chain.call({instruction: instruction})
+}
+/**
+ * Create a python program by example. input should be a string.
+ * @param input - A list of input examples
+ * @param output - A list of output examples
+ */
+export const programByExample = async (input: string[], output: string) => {
 
-let prompt = new PromptTemplate({
-    template: template,
-    inputVariables: ["title"],
-});
+    const _input = JSON.stringify(input);
+
+    const prompt = new PromptTemplate({
+        template: templateProgramByExample,
+        inputVariables: ["input", "output"],
+    });
+    const chain = new LLMChain({llm: model, prompt: prompt});
+    return await chain.call({input: _input, output: output})
+}
+/**
+ * Create an Optimus python program from text. input should be a string.
+ * @param instructions - Text instructions to generate the code
+ * @param data - A list of input examples
+ *
+ */
+export const codeGeneration = async (instructions: string, data: string) => {
+
+    let promptInstruction = new PromptTemplate({
+        template: textToInstructions,
+        inputVariables: ["instructions", "data"],
+    });
+    let promptCode = new PromptTemplate({
+        template: instructionsToOptimus,
+        inputVariables: ["instructions"],
+    });
 
 
-const synopsisChain = new LLMChain({llm: llm, prompt: prompt});
+    const synopsisChain = new LLMChain({llm: model, prompt: promptInstruction});
+    const reviewChain = new LLMChain({llm: model, prompt: promptCode});
 
-template = `You are a play critic from the New York Times. Given the synopsis of play, it is your job to write a review for that play.
+    const overallChain = new SimpleSequentialChain({
+        chains: [synopsisChain, reviewChain],
+    });
 
-Play Synopsis:
-{synopsis}
-Review from a New York Times play critic of the above play:`
-
-prompt = new PromptTemplate({
-    template: template,
-    inputVariables: ["synopsis"],
-});
-
-const reviewChain = new LLMChain({llm: llm, prompt: prompt});
-
-const overallChain = new SimpleSequentialChain({
-    chains: [synopsisChain, reviewChain],
-});
-
-const review = await overallChain.run("Tragedy at sunset on the beach")
-console.log(review)
+    return await overallChain.run({instructions: instructions, data: data});
+}
