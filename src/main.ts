@@ -1,21 +1,3 @@
-// import {OpenAI} from "langchain/llms/openai";
-// import {PromptTemplate} from "langchain/prompts";
-// import {LLMChain} from "langchain/chains";
-//
-// const model = new OpenAI({openAIApiKey: import.meta.env.VITE_OPENAI_API_KEY, temperature: 0.9});
-//
-// const template = "What is a good name for a company that makes {product}?";
-// const prompt = new PromptTemplate({
-//     template: template,
-//     inputVariables: ["product"],
-// });
-//
-// const chain = new LLMChain({llm: model, prompt: prompt});
-//
-// const res = await chain.call({product: "colorful socks"});
-// console.log(res.text);
-// console.log()
-
 import {OpenAI} from "langchain/llms/openai";
 import {
     templateCreateDateFormat, templateDataInsights, templateDataSummary,
@@ -127,7 +109,7 @@ export const programByExample = async (input: string[], output: string) => {
  */
 export const executeInstruction = async (prompt: string, dataTable: string) => {
     const codeProcessor = new CodeProcessor()
-    return codeProcessor.createCode(prompt, dataTable)
+    return codeProcessor.generateAndExecuteCode(prompt, dataTable)
 
 }
 /**
@@ -178,14 +160,31 @@ export const fixCode = async (code: string, error: string) => {
     return await chain.call({code: code, error: error})
 }
 
-export const executePythonCode = async (code: string) => {
-    return code
+type ExecutePythonCodeResult = {
+    success: boolean,
+    result: string
+};
+
+export const executePythonCode = async (code: string): Promise<ExecutePythonCodeResult> => {
+    try {
+        return {"success": true, "result": "python code"}
+        // return {"success": true, "result": await runPythonCode(code)}
+    } catch (error) {
+        return {
+            "success": false,
+            "result": error instanceof Error ? error.stack || "An error occurred" : "An error occurred"
+        };
+    }
 }
 
 function escapeBackslashes(str: string) {
     return str.replace(/\\/g, '\\\\');
 }
 
+/**
+ * CodeProcessor class
+ * This class is used to execute and fix python code
+ */
 export class CodeProcessor {
     private retryCount: number;
 
@@ -194,38 +193,35 @@ export class CodeProcessor {
     }
 
     /**
-     * Create a python program by example. input should be a string.
+     * Create and execute python code. input should be a string.
      * @param prompt - The description of the program you want to create
      * @param dataTable - The data table used as input to create the program
      */
-    async createCode(prompt: string, dataTable: string): Promise<void> {
+    async generateAndExecuteCode(prompt: string, dataTable: string): Promise<void> {
         // convert prompt to instructions
         const instructions = await promptToInstructions(prompt, dataTable);
         // convert instructions to python code
         const code = await instructionsToCode(instructions.text, dataTable);
 
-        await this.executeAndFixCode(code);
+        await this.executeOrFixCode(code);
     }
 
     /**
-     * Execute and fix a python code. input should be a string.
+     * Execute or fix an execute python code If needed. input should be a string.
      * @param code - The code to execute and fix if needed
      */
-    async executeAndFixCode(code: string): Promise<void> {
-        let errorDescription = ""
-        try {
-            // use some API to execute python code
-            // assuming this API throws an error if code can't be compiled
-            errorDescription = await executePythonCode(code);
-        } catch (error) {
+    private async executeOrFixCode(code: string): Promise<void> {
+        // use some API to execute python code
+        // assuming this API throws an error if code can't be compiled
+        let {success, result} = await executePythonCode(code);
+        if (success) {
             if (this.retryCount < 3) {
                 this.retryCount += 1;
-                const fixedCode = await fixCode(code, errorDescription);
-                await this.executeAndFixCode(fixedCode.text);
+                const fixedCode = await fixCode(code, result);
+                await this.executeOrFixCode(fixedCode.text);
             } else {
                 console.error('Could not fix code after 3 attempts');
             }
         }
     }
-
 }
