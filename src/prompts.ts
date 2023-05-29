@@ -12,7 +12,13 @@ export const templateCreateChart = `
  * @param query
  */
 export const templateDataInsights = `
+    Act as an expert in data analysis. Make a descriptive analytics of data below \n 
+    {dataTable}?
     
+    Take into account the data statics shown below to get insights about the data:
+    {dataStats}    
+    
+    Get 5 hidden insights about the data. Do not limit yourself to the data shown above. Try to not repeat the value giving in the stats and explain the insight in plain english.
 `
 
 /** Create a python date format from a description
@@ -43,21 +49,22 @@ export const templateCreateDateFormat =
  * @param query
  */
 export const templateRegex =
-    `
+    `    
+    
     Read the scenario and answer the following question:
     Scenario: "You're a data engineer that wants to create a regex to match a string starting with the letter 'P'"
     
     Q: Can you create a JSON-formatted Python regex to match a string that starts with the letter 'P'?
-    A: {{"regex": r'^P.*'}}
+    A: {{"regex": "^P.*"}}
     
     Scenario: "You're a data engineer that wants to create a regex to match a string in a dataframe"
     
     Q: Create a JSON-formatted Python regex to remove numbers from strings?
-    A: {{"regex": r'\d+'}}
+    A: {{"regex": "\\d+"}}
     
     Scenario: "You're a data engineer that wants to create a regex"
     
-    Q: Create a JSON-formatted Python regex to {instruction}?
+    Q: Create a JSON-formatted Python regex from {instruction}?
     A: 
     `;
 
@@ -90,10 +97,8 @@ export const templateProgramByExample =
  * Create Optimus instructions to transform a dataframe.
  * @param instruction
  */
-export const instructionsToOptimus =
-
-     `
-    
+export const templateInstructionsToCode =
+    `
     Read the scenario and answer the following question:
     Scenario: "You are and AI that convert instructions to python code."
     
@@ -140,7 +145,7 @@ export const instructionsToOptimus =
  * @param instruction
  * @param data
  */
-export const textToInstructions =
+export const templateTextToInstructions =
     `
     Read the scenario and answer the following question:
     Scenario: "You're a data analyst who needs to create a new column called 'new_column' using price divided by area."
@@ -256,4 +261,11 @@ export const templateDataSummary =
     
     A:
     `
+export const templateFixCode =
+    "Act as a Python expert. Review this code:\n{code}\n and fix this \n{error}\n";
+
+
+// join
+// insights
+// labeling
 
